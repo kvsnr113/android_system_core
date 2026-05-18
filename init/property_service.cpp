@@ -75,6 +75,11 @@
 #include "util.h"
 #include "vendor_init.h"
 
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+#include <linux/blkpg.h>
+#include <openssl/sha.h>
+
 using namespace std::literals;
 
 using android::base::GetProperty;
@@ -1052,6 +1057,43 @@ static void property_initialize_ro_vendor_api_level() {
     }
 }
 
+static void SetPropIfEmpty(const char* name, const char* value) {
+    std::string cur = GetProperty(name, "");
+    if (cur.empty()) {
+        std::string error;
+        auto res = PropertySet(name, value, &error);
+        if (res != PROP_SUCCESS) {
+            LOG(ERROR) << "Failed to set property '" << name
+                       << "' to '" << value << "': err=" << res << " (" << error << ")";
+        }
+    }
+}
+
+static void SetVbmetaBootProps() {
+    const std::string persisted = GetProperty("persist.sys.vbmeta.digest", "");
+    if (!persisted.empty() && GetProperty("ro.boot.vbmeta.digest", "").empty()) {
+        InitPropertySet("ro.boot.vbmeta.digest", persisted);
+    }
+
+    SetPropIfEmpty("ro.boot.vbmeta.device_state", "locked");
+    SetPropIfEmpty("ro.boot.vbmeta.invalidate_on_error", "yes");
+    SetPropIfEmpty("ro.boot.vbmeta.avb_version", "1.0");
+    SetPropIfEmpty("ro.boot.vbmeta.hash_alg", "sha256");
+
+    {
+        std::string slot_suffix = GetProperty("ro.boot.slot_suffix", "");
+        std::string path = "/dev/block/by-name/vbmeta";
+        if (!slot_suffix.empty()) path += slot_suffix;
+        int fd = TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY | O_CLOEXEC));
+        uint64_t blksz = 0;
+        if (ioctl(fd, BLKGETSIZE64, &blksz) == 0 && blksz > 0) {
+            std::string blksz_str = std::to_string(blksz);
+            SetPropIfEmpty("ro.boot.vbmeta.size", blksz_str.c_str());
+        }
+        close(fd);
+    }
+}
+
 void PropertyLoadBootDefaults() {
     // We read the properties and their values into a map, in order to always allow properties
     // loaded in the later property files to override the properties in loaded in the earlier
@@ -1286,7 +1328,6 @@ static void ProcessBootconfig() {
 static void SetSafetyNetProps() {
 
     InitPropertySet("ro.boot.flash.locked", "1");
-    InitPropertySet("ro.boot.vbmeta.device_state", "locked");
     InitPropertySet("ro.boot.verifiedbootstate", "green");
     InitPropertySet("ro.boot.veritymode", "enforcing");
 
@@ -1343,6 +1384,7 @@ void PropertyInit() {
     // these properties are read-only and will be set to invalid values with
     // androidboot cmdline arguments.
     if (!IsRecoveryMode()) {
+      SetVbmetaBootProps();
       SetSafetyNetProps();
       SpoofProps();
     }
@@ -1384,6 +1426,9 @@ static void HandleInitSocket() {
             }
             InitPropertySet("ro.persistent_properties.ready", "true");
             persistent_properties_loaded = true;
+            if (!IsRecoveryMode()) {
+                SetVbmetaBootProps();
+            }
             break;
         }
         default:
