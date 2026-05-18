@@ -1292,6 +1292,38 @@ static void SetSafetyNetProps() {
 
 }
 
+static void SpoofProps() {
+    // no exTHmUI sniff sniff
+    InitPropertySet("ro.product.name", "munch");
+    InitPropertySet("ro.product.odm.name", "munch");
+    InitPropertySet("ro.product.product.name", "munch");
+    InitPropertySet("ro.product.system.name", "munch");
+    InitPropertySet("ro.product.system_ext.name", "munch");
+    InitPropertySet("ro.product.vendor.name", "munch");
+    InitPropertySet("ro.product.vendor_dlkm.name", "munch");
+    InitPropertySet("ro.build.flavor", "munch-user");
+
+    // no build description sniff sniff
+    InitPropertySet("ro.build.description", "munch-user 13 RKQ1.211001.001/V14.0.3.0.TLMMIXM:user/release-keys");
+    
+    // no custom recovery (bootimage) sniff sniff
+    InitPropertySet("ro.bootimage.build.fingerprint", "Redmi/munch/munch:13/RKQ1.211001.001/V14.0.3.0.TLMMIXM:user/release-keys");
+    InitPropertySet("ro.bootimage.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.bootimage.build.type", "user");
+    InitPropertySet("ro.bootimage.build.tags", "release-keys");
+    InitPropertySet("ro.product.bootimage.name", "munch");
+
+    // no incremental sniff sniff
+    InitPropertySet("ro.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.odm.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.product.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.system.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.system_ext.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.vendor.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    InitPropertySet("ro.vendor_dlkm.build.version.incremental", "V14.0.3.0.TLMMIXM");
+    
+}
+
 void PropertyInit() {
     selinux_callback cb;
     cb.func_audit = PropertyAuditCallback;
@@ -1312,6 +1344,7 @@ void PropertyInit() {
     // androidboot cmdline arguments.
     if (!IsRecoveryMode()) {
       SetSafetyNetProps();
+      SpoofProps();
     }
 
     // If arguments are passed both on the command line and in DT,
